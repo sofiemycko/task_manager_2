@@ -85,7 +85,7 @@ def test_pridat_ukol_pozitivni(db_setup):
     assert result[2] == popis, "Popis není správný."
     assert result[3] == stav, "Výchozí stav by měl být 'Nezahájeno'."
 
-# Negativní: vložení NULL jako názvu vyvolá výjimku (NOT NULL constraint).
+# Negativní: vložení NULL jako názvu vyvolá výjimku (validace vstupu).
 def test_pridat_ukol_negativni(db_setup):
     conn, cursor = db_setup
     
@@ -93,7 +93,7 @@ def test_pridat_ukol_negativni(db_setup):
     nazev = None
     popis = "Popis"
 
-    with pytest.raises(Error):
+    with pytest.raises(ValueError):
         db_pridat_ukol(conn, nazev, popis)
 
 # Negativní: vložení prázdného řetězce jako názvu vyvolá výjimku před voláním DB.
