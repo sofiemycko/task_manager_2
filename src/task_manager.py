@@ -1,17 +1,24 @@
+import os
 import mysql.connector
 from mysql.connector import Error
+from dotenv import load_dotenv
+
+load_dotenv()
 
 ###  Připojení k databázi
-def pripojeni_db(config=None):
-    """Vytvoří připojení k MySQL databázi. Vrátí objekt conn nebo None."""
+def pripojeni_db():
+    """Vytvoří připojení k MySQL databázi. Pokud databáze neexistuje, vytvoří ji. Vrátí objekt conn nebo None."""
     try:
         conn = mysql.connector.connect(
-            host="127.0.0.1",
-            user="root",
-            password="1111",
+            host=os.getenv("DB_HOST", "127.0.0.1"),
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASSWORD"),
             use_pure=True, # V mém případě se bez toho nebylo možné k MySQL 9.0.6 připojit
-            database="task_manager"
         )
+        cursor = conn.cursor()
+        cursor.execute("CREATE DATABASE IF NOT EXISTS task_manager")
+        cursor.execute("USE task_manager")
+        cursor.close()
         return conn
     except Error as e:
         print(f"Chyba při připojení k databázi: {e}")
@@ -42,6 +49,10 @@ def vytvoreni_tabulky(conn):
 
 def db_pridat_ukol(conn, nazev, popis):
     """Vloží nový úkol do DB. Vrátí ID nového záznamu."""
+    if not nazev or not nazev.strip():
+        raise ValueError("Název úkolu nesmí být prázdný.")
+    if not popis or not popis.strip():
+        raise ValueError("Popis úkolu nesmí být prázdný.")
     sql = "INSERT INTO ukoly (nazev, popis) VALUES (%s, %s)"
     cursor = conn.cursor()
     cursor.execute(sql, (nazev, popis))

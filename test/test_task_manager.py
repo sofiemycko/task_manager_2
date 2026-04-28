@@ -1,11 +1,15 @@
+import os
 import pytest
 import mysql.connector
 from mysql.connector import Error
+from dotenv import load_dotenv
 from src.task_manager import (
     db_pridat_ukol,
     db_aktualizovat_ukol,
     db_odstranit_ukol,
 )
+
+load_dotenv()
 
 ###  Konfigurace testovací databáze 
 pouzivat_test_db = True # Pokud True, testy budou používat databázi task_manager_test. Pokud False, použijí produkční databázi task_manager.
@@ -21,9 +25,9 @@ def db_setup():
     database = "task_manager_test" if pouzivat_test_db else "task_manager"
 
     conn = mysql.connector.connect(
-        host="127.0.0.1",
-        user="root",
-        password="1111",
+        host=os.getenv("DB_HOST", "127.0.0.1"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
         use_pure=True,  # V mém případě se bez toho nebylo možné k MySQL 9.0.6 připojit
     )
     cursor = conn.cursor()
@@ -48,17 +52,17 @@ def db_setup():
         """)
         conn.commit()
 
-    # předání připojení a kurzoru testům
-    yield conn, cursor
+    try:
+        # předání připojení a kurzoru testům
+        yield conn, cursor
 
-    # úklid po testu: smazání tabulky ukoly (pouze pro testovací DB)
-    if pouzivat_test_db:
-        cursor.execute("DROP TABLE IF EXISTS ukoly")
-        conn.commit()
-
-    # uzavření připojení
-    cursor.close()
-    conn.close()
+        # úklid po testu
+        if pouzivat_test_db:
+            cursor.execute("DROP TABLE IF EXISTS ukoly")
+            conn.commit()
+    finally:
+        cursor.close()
+        conn.close()
 
 
 ###  Testy: pridat_ukol
@@ -81,7 +85,7 @@ def test_pridat_ukol_pozitivni(db_setup):
     assert result[2] == popis, "Popis není správný."
     assert result[3] == stav, "Výchozí stav by měl být 'Nezahájeno'."
 
-# Negativní: vložení NULL jako popisu vyvolá výjimku (NOT NULL constraint).
+# Negativní: vložení NULL jako názvu vyvolá výjimku (NOT NULL constraint).
 def test_pridat_ukol_negativni(db_setup):
     conn, cursor = db_setup
     
@@ -90,6 +94,17 @@ def test_pridat_ukol_negativni(db_setup):
     popis = "Popis"
 
     with pytest.raises(Error):
+        db_pridat_ukol(conn, nazev, popis)
+
+# Negativní: vložení prázdného řetězce jako názvu vyvolá výjimku před voláním DB.
+def test_pridat_ukol_negativni_prazdny_retezec(db_setup):
+    conn, cursor = db_setup
+
+    # testovací data
+    nazev = ""
+    popis = "Popis"
+
+    with pytest.raises(ValueError):
         db_pridat_ukol(conn, nazev, popis)
 
 
